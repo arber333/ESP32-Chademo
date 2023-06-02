@@ -1,7 +1,7 @@
 #ifndef GLOBALS_H_
 #define GLOBALS_H_
 
-#define CHADEMO_IN1 34
+#define CHADEMO_IN1 32 //Input1 for chademo
 #define CHADEMO_IN2 35
 
 #define CHADEMO_OUT1 32//??
