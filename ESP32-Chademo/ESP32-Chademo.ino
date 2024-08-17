@@ -26,7 +26,7 @@ int Count = 0;
 int socketMessage = 0;
 
 ISA Sensor;
-ACAN2517FD can1 (MCP2517_CS, SPI, MCP2517_INT) ;
+ACAN2517FD can1 (MCP2517_CS, mySPI, MCP2517_INT) ;
 EESettings settings;
 ChademoWebServer chademoWebServer(settings);
 String cmdStr;
