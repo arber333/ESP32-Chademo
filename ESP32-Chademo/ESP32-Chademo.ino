@@ -4,7 +4,7 @@
 #include "ChademoWebServer.h"
 #include <SPIFFS.h>
 #include <ACAN_ESP32.h>
-#include <ACAN2515.h>
+#include <ACAN2517FD.h>
 #include <SPI.h>
 #include <EEPROM.h>
 #include <WiFi.h>
@@ -26,7 +26,7 @@ int Count = 0;
 int socketMessage = 0;
 
 ISA Sensor;
-ACAN2515 can1 (MCP2515_CS, SPI, MCP2515_INT) ;
+ACAN2517FD can1 (inCS, inSPI, inINT) ;
 EESettings settings;
 ChademoWebServer chademoWebServer(settings);
 String cmdStr;
