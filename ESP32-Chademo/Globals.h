@@ -1,14 +1,14 @@
 #ifndef GLOBALS_H_
 #define GLOBALS_H_
 
-#define CHADEMO_IN1 32 //Input1 for chademo
-#define CHADEMO_IN2 35
+#define CHADEMO_IN1 36 //Input1 for chademo
+#define CHADEMO_IN2 39 //PP input
 
-#define CHADEMO_OUT1 32//??
-#define CHADEMO_OUT2 33//??
+#define CHADEMO_OUT1 33//??
+#define CHADEMO_OUT2 25//??
 
 #define MCP2515_CS 5// CS input of MCP2515
-#define MCP2515_INT 27 // INT output of MCP2515
+#define MCP2515_INT 15 // INT output of MCP2515
 #define MCP2515_SCK 18
 #define MCP2515_QUARTZ_FREQUENCY 16000000
 #define MCP2515_MISO 19
@@ -20,11 +20,11 @@
 
 //These have been moved to eeprom. After initial compile the values will be read from EEPROM.
 //These thus set the default value to write to eeprom upon first start up
-#define MAX_CHARGE_V	158
-#define MAX_CHARGE_A	130
-#define TARGET_CHARGE_V	160
+#define MAX_CHARGE_V	380
+#define MAX_CHARGE_A	120
+#define TARGET_CHARGE_V	380
 #define MIN_CHARGE_A	20
-#define CAPACITY 180
+#define CAPACITY 140
 
 typedef struct
 {
