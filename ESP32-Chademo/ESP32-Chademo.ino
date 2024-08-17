@@ -26,7 +26,7 @@ int Count = 0;
 int socketMessage = 0;
 
 ISA Sensor;
-ACAN2517FD can1 (MCP2517_CS, mySPI, MCP2517_INT) ;
+ACAN2517FD can1 (MCP2517_CS, SPI, MCP2517_INT) ;
 EESettings settings;
 ChademoWebServer chademoWebServer(settings);
 String cmdStr;
@@ -96,7 +96,7 @@ void setup() {
     Serial.print ("Can0 Configuration error 0x") ;
     Serial.println (errorCode, HEX) ;
   }
-  mySPI.begin(MCP2517_SCK, MCP2517_MISO, MCP2517_MOSI, MCP2517_CS) ;
+  SPI.begin(MCP2517_SCK, MCP2517_MISO, MCP2517_MOSI, MCP2517_CS) ;
   ACAN2517Settings settings2517 (MCP2517_QUARTZ_FREQUENCY, CAN_BAUD);
   errorCode = can1.begin(settings2515, [] { can1.isr () ; });
   if (errorCode > 0) {
