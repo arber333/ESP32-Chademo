@@ -97,7 +97,7 @@ void setup() {
     Serial.println (errorCode, HEX) ;
   }
   SPI.begin(MCP2517_SCK, MCP2517_MISO, MCP2517_MOSI, MCP2517_CS) ;
-  ACAN2517Settings settings2517 (MCP2517_QUARTZ_FREQUENCY, CAN_BAUD);
+  ACAN2517FDSettings settings (OSC_40MHz, CAN_BAUD);
   errorCode = can1.begin(settings2515, [] { can1.isr () ; });
   if (errorCode > 0) {
     Serial.print ("Can1 Configuration error 0x") ;
