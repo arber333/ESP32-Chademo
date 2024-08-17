@@ -7,12 +7,12 @@
 #define CHADEMO_OUT1 26 // Contactor
 #define CHADEMO_OUT2 27 // Contactor
 
-#define MCP2515_CS 5// CS input of MCP2515
-#define MCP2515_INT 15 // INT output of MCP2515
-#define MCP2515_SCK 18
-#define MCP2515_QUARTZ_FREQUENCY 16000000
-#define MCP2515_MISO 19
-#define MCP2515_MOSI 23
+#define MCP2517_CS 5// CS input of MCP2517
+#define MCP2517_INT 15 // INT output of MCP2517
+#define MCP2517_SCK 18
+#define MCP2517_QUARTZ_FREQUENCY 40000000
+#define MCP2517_MISO 19
+#define MCP2517_MOSI 23
 
 #define CAN_BAUD 500000
 #define min(a, b)           (((a) < (b)) ?  (a) : (b))
