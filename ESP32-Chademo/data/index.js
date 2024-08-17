@@ -35,23 +35,8 @@ function setValue(id, value) {
 	element.innerHTML = value
 }
 
-//  STARTUP,
-SEND_INITIAL_PARAMS,
-WAIT_FOR_EVSE_PARAMS,
-SET_CHARGE_BEGIN,
-WAIT_FOR_BEGIN_CONFIRMATION,
-CLOSE_CONTACTORS,
-WAIT_FOR_PRECHARGE,
-RUNNING,
-CEASE_CURRENT,
-WAIT_FOR_ZERO_CURRENT,
-OPEN_CONTACTOR,
-FAULTED,
-STOPPED,
-LIMBO
-//
 function updateText(key, data) {
-	if (key == 'status') {
+	if (key == 'chademoState') {
 		if (data == 0) {
 			setValue('mode', "Waiting");
 		} else if (data == 1) {
@@ -65,20 +50,18 @@ function updateText(key, data) {
 		} else if (data == 5) {
 			setValue('mode', "Close Contactors");
 		} else if (data == 6) {
-			setValue('mode', "Precharge");
-		} else if (data == 7) {
 			setValue('mode', "Running");
-		} else if (data == 8) {
+		} else if (data == 7) {
 			setValue('mode', "Sending Stop");
-		} else if (data == 9) {
+		} else if (data == 8) {
 			setValue('mode', "Wait for Stop");
-		} else if (data == 10) {
+		} else if (data == 9) {
 			setValue('mode', "Open Contactors");
-		} else if (data == 11) {
+		} else if (data == 10) {
 			setValue('mode', "Fault");
-		} else if (data == 12) {
+		} else if (data == 11) {
 			setValue('mode', "Stopped");
-		} else if (data == 13) {
+		} else if (data == 12) {
 			setValue('mode', "Limbo");
 		} else {
 			setValue('mode', "Unknown");
@@ -97,9 +80,76 @@ function updateText(key, data) {
 		setValue('out1', data)
 	} else if (key == 'OUT2') {
 		setValue('out2', data)
+	} else if (key == 'OVER1') {
+		setValue('over1', data)
+	} else if (key == 'OVER2') {
+		setValue('over2', data)
+	} else if (key == 'info') {
+		writeToLog(data);
 	}
 }
 function initHandlers() {
+	var button = document.getElementById('saveLog');
+	button.addEventListener('click', saveTextAsFile);
+
+	var start1 = document.getElementById('start1')
+	start1.addEventListener('click', function() {
+		const xhr = new XMLHttpRequest();
+
+		// listen for `load` event
+		xhr.onload = () => {
+
+			// print JSON response
+			if (xhr.status >= 200 && xhr.status < 300) {
+				// parse JSON
+
+			}
+		};
+
+		xhr.open('POST', '/start1');
+		xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+		xhr.send({body:"void"})
+	});
+
+
+	var start2 = document.getElementById('start2')
+	start2.addEventListener('click', function() {
+		const xhr = new XMLHttpRequest();
+
+		// listen for `load` event
+		xhr.onload = () => {
+
+			// print JSON response
+			if (xhr.status >= 200 && xhr.status < 300) {
+				// parse JSON
+
+			}
+		};
+
+		xhr.open('POST', '/start2');
+		xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+		xhr.send({body:"void"})
+	});
+
+	var initShunt = document.getElementById('initShunt')
+	initShunt.addEventListener('click', function() {
+		const xhr = new XMLHttpRequest();
+
+		// listen for `load` event
+		xhr.onload = () => {
+
+			// print JSON response
+			if (xhr.status >= 200 && xhr.status < 300) {
+				// parse JSON
+
+			}
+		};
+
+		xhr.open('POST', '/init');
+		xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+		xhr.send({body:"void"})
+	});
+
 
 }
 
@@ -109,13 +159,13 @@ function onLoad() {
 
 	// output = document.getElementById("output");
 	initGauges();
-	// initHandlers();
+	initHandlers();
 }
 
 function onOpen(evt) {
 	console.log("Socket Connected");
 }
-   
+
 function onMessage(json) {
 	Object.keys(json).forEach(function(key) {
 		updateGauge(key, json[key]);
@@ -128,20 +178,19 @@ function onMessage(json) {
  function onError(evt) {
 	console.log("Socket Error")
  }
-   
+
  function doSend(message) {
 	websocket.send(message);
  }
-   
- function writeToScreen(message) {
-	var pre = document.createElement("p"); 
-	pre.style.wordWrap = "break-word"; 
-	pre.innerHTML = message; output.appendChild(pre);
+
+ function writeToLog(message) {
+	const element = document.getElementById("log");
+	element.value += "\n"+ message;
  }
 
  function chargerWebSocket(wsUri) {
 	websocket = new WebSocket(wsUri);
-	   
+
 	websocket.onopen = function(evt) {
 	   onOpen(evt)
 	};
@@ -149,43 +198,39 @@ function onMessage(json) {
 	websocket.onclose = function(evt) {
 		console.log(evt)
 	};
-   
+
 	websocket.onmessage = function(evt) {
 		onMessage(JSON.parse(evt.data))
 	};
-   
+
 	websocket.onerror = function(evt) {
 	   onError(evt)
 	};
  }
 
- function fileSelected()
-{
-}
+ function saveTextAsFile() {
+	var textToWrite = document.getElementById('log').value;
+	var textFileAsBlob = new Blob([ textToWrite ], { type: 'text/plain' });
+	var fileNameToSaveAs = "chademo_log.txt"; //filename.extension
 
-/** @brief uploads file to web server, if bin-file uploaded, starts a firmware upgrade */
-function uploadFile() 
-{
-	var xmlhttp = new XMLHttpRequest();
-	var form = document.getElementById('uploadform');
-	
-	if (form.getFormData)
-		var fd = form.getFormData();
-	else
-		var fd = new FormData(form);
-	var file = document.getElementById('updatefile').files[0].name;
-
-	xmlhttp.onload = function() 
-	{
-		document.getElementById("bar").innerHTML = "<p>Upload complete</p>";
-		if (file.endsWith(".hex"))
-		{
-			runUpdate(-1, "/" + file);
-		} else {
-			setTimeout(function() { document.getElementById("bar").innerHTML = "" }, 5000);
-		}
+	var downloadLink = document.createElement("a");
+	downloadLink.download = fileNameToSaveAs;
+	downloadLink.innerHTML = "Download File";
+	if (window.webkitURL != null) {
+	  // Chrome allows the link to be clicked without actually adding it to the DOM.
+	  downloadLink.href = window.webkitURL.createObjectURL(textFileAsBlob);
+	} else {
+	  // Firefox requires the link to be added to the DOM before it can be clicked.
+	  downloadLink.href = window.URL.createObjectURL(textFileAsBlob);
+	  downloadLink.onclick = destroyClickedElement;
+	  downloadLink.style.display = "none";
+	  document.body.appendChild(downloadLink);
 	}
 
-	xmlhttp.open("POST", "/edit");
-	xmlhttp.send(fd);
-}
+	downloadLink.click();
+  }
+
+  function destroyClickedElement(event) {
+	// remove the link from the DOM
+	document.body.removeChild(event.target);
+  }

@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include "Globals.h"
 #include <ACAN_ESP32.h>
+#include "WebSocketPrint.h"
 
 enum CHADEMOSTATE
 {
@@ -12,7 +13,6 @@ enum CHADEMOSTATE
   SET_CHARGE_BEGIN,
   WAIT_FOR_BEGIN_CONFIRMATION,
   CLOSE_CONTACTORS,
-  WAIT_FOR_PRECHARGE,
   RUNNING,
   CEASE_CURRENT,
   WAIT_FOR_ZERO_CURRENT,
@@ -53,6 +53,8 @@ typedef struct
   uint8_t chargingFault : 1; //signal EVSE that we found a fault
   uint8_t contactorOpen : 1; //tell EVSE whether we've closed the charging contactor
   uint8_t stopRequest : 1; //request that the charger cease operation before we really get going
+  uint8_t derated : 1; //request that the charger cease operation before we really get going
+
 } CARSIDE_STATUS;
 
 //The IDs for chademo comm - both carside and EVSE side so we know what to listen for
@@ -86,7 +88,7 @@ typedef struct
 class CHADEMO
 {
   public:
-    CHADEMO();
+    CHADEMO(WebSocketPrint& webSocketPrint);
     void setDelayedState(int newstate, uint16_t delayTime);
     CHADEMOSTATE getState();
     EVSE_PARAMS getEVSEParams();
@@ -101,10 +103,12 @@ class CHADEMO
     void setBattOverTemp();
     void setStateOfCharge(uint8_t stateofcharge);
 
+
     //these need to be accessed quickly in tight spots so they're public in an attempt at efficiency
     uint8_t bChademoMode; //accessed but not modified in ISR so it should be OK non-volatile
     uint8_t bChademoSendRequests; //should we be sending periodic status updates?
     volatile uint8_t bChademoRequest;  //is it time to send one of those updates?
+    CARSIDE_STATUS carStatus;
 
   protected:
   private:
@@ -128,18 +132,16 @@ class CHADEMO
     uint32_t lastCommTime;
     const uint16_t lastCommTimeout = 1000; //allow up to 1 second of comm fault before getting angry
     uint8_t soc; //BMS reported SoC
-
     CHADEMOSTATE chademoState;
     CHADEMOSTATE stateHolder;
     EVSE_PARAMS evse_params;
     EVSE_STATUS evse_status;
-    CARSIDE_STATUS carStatus;
 
     void sendCANStatus();
     void sendCANBattSpecs();
     void sendCANChargingTime();
-};
 
-extern CHADEMO chademo;
+    WebSocketPrint& webSocketPrint;
+};
 
 #endif

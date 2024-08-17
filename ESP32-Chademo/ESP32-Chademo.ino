@@ -2,6 +2,8 @@
 #include "Chademo.h"
 #include "ISAShunt.h"
 #include "ChademoWebServer.h"
+#include "WebSocketPrint.h"
+
 #include <SPIFFS.h>
 #include <ACAN_ESP32.h>
 #include <ACAN2517FD.h>
@@ -24,11 +26,18 @@ float Power = 0;
 float lastSavedAH = 0;
 int Count = 0;
 int socketMessage = 0;
+uint8_t soc;
+extern bool overrideStart1 = false;
+extern bool overrideStart2 = false;
+extern bool initShunt = false;
 
 ISA Sensor;
 ACAN2517FD can1 (MCP2517_CS, SPI, MCP2517_INT) ;
 EESettings settings;
 ChademoWebServer chademoWebServer(settings);
+WebSocketPrint wsPrint(chademoWebServer.getWebSocket());
+CHADEMO chademo(wsPrint);
+
 String cmdStr;
 byte Command = 0; // "z" will reset the AmpHours and KiloWattHours counters
 
@@ -78,6 +87,8 @@ void setup() {
   
   pinMode(CHADEMO_IN2, INPUT);
   pinMode(CHADEMO_IN1, INPUT);
+  pinMode(CHADEMO_OUT1, OUTPUT);
+  pinMode(CHADEMO_OUT2, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH);
 
@@ -118,8 +129,13 @@ void setup() {
     settings.minChargeAmperage = MIN_CHARGE_A;
     settings.capacity = CAPACITY;
     settings.debuggingLevel = 1;
+    settings.currentMissmatch = true;
     Save();
   }
+  //set to false on every boot.
+  overrideStart1 = false;
+  overrideStart2 = false;
+
   help8Val = 1;
   print8Val = 1;
 
@@ -127,7 +143,7 @@ void setup() {
 
   WiFi.mode(WIFI_AP);
   WiFi.hostname(HOSTNAME);
-  WiFi.begin();
+  WiFi.begin("Beetle_Chademo", "Fia84grapu");
 
   chademoWebServer.setup();
 
@@ -160,6 +176,76 @@ void Save()
   Serial.println (F("SAVED"));
   interrupts();
   delay(1000);
+}
+
+void initaliseShunt() 
+{
+  CANMessage outframe;
+
+  outframe.id = 0x411;      // Set our transmission address ID
+  outframe.len = 8;       // Data payload 8 bytes
+  outframe.data[0]=0x34;
+  outframe.data[1]=0x00;  
+  outframe.data[2]=0x01;
+  outframe.data[3]=0x00;
+  outframe.data[4]=0x00;
+  outframe.data[5]=0x00;
+  outframe.data[6]=0x00;
+  outframe.data[7]=0x00;
+  bool sent = can1.tryToSend(outframe);
+
+	delay(700);
+	for(int i=0;i<9;i++)
+	{
+
+	
+    outframe.id = 0x411;      // Set our transmission address ID
+    outframe.len = 8;       // Data payload 8 bytes
+    outframe.data[0]=(0x20+i);
+    outframe.data[1]=0x42;  
+    outframe.data[2]=0x00;
+    outframe.data[3]=(0x60+(i*18));
+    outframe.data[4]=0x00;
+    outframe.data[5]=0x00;
+    outframe.data[6]=0x00;
+    outframe.data[7]=0x00;
+
+    can1.tryToSend(outframe);
+
+    delay(500);
+
+    outframe.id = 0x411;      // Set our transmission address ID
+    outframe.len = 8;       // Data payload 8 bytes
+    outframe.data[0]=0x32;
+    outframe.data[1]=0x00;  
+    outframe.data[2]=0x00;
+    outframe.data[3]=0x00;
+    outframe.data[4]=0x00;
+    outframe.data[5]=0x00;
+    outframe.data[6]=0x00;
+    outframe.data[7]=0x00;
+    can1.tryToSend(outframe);
+
+    delay(500);
+  }
+
+  outframe.id = 0x411;      // Set our transmission address ID
+  outframe.len = 8;       // Data payload 8 bytes
+  outframe.data[0]=0x34;
+  outframe.data[1]=0x01;  
+  outframe.data[2]=0x01;
+  outframe.data[3]=0x00;
+  outframe.data[4]=0x00;
+  outframe.data[5]=0x00;
+  outframe.data[6]=0x00;
+  outframe.data[7]=0x00;
+  can1.tryToSend(outframe);
+
+  initShunt = false;                 
+
+  const char * message = "Shunt Init Complete";
+  chademoWebServer.getWebSocket().textAll(message, strlen(message));
+
 }
 
 void sendStatusToVCU()
@@ -223,6 +309,10 @@ void printHelp() {
   Serial.println(F("CAPKWH - Sets pack kilowatt-hours"));
   Serial.println(F("DBG - Sets debugging level"));
   Serial.println(F("BMS - Sets use to 0 - No BMS, 1 - ESP32 BMS for SoC and cell voltage and temeratures"));
+  Serial.println(F("MISS - Sets use to 0 - Disable Current Miss-Match check, 1 - Enable Current Miss-Match check"));
+  Serial.println(F("OVER1 - Sets use to 0 - Disable Override Start 1, 1 - Enable Override Start 1"));
+  Serial.println(F("OVER2 - Sets use to 0 - Disable Override Start 2, 1 - Enable Override Start 2"));
+
 
   Serial.println(F("Example: V=395 - sets CHAdeMO voltage target to 395"));
 }
@@ -283,6 +373,36 @@ void ParseCommand() {
     uint8Val = Serial.parseInt();
     if (uint8Val >= 0 && uint8Val < 2) {
       settings.useBms = uint8Val == 1;
+      Save();
+      print8Val = 1;
+    } else {
+      RngErr();
+    }
+  }
+  else if (cmdStr == "MISS") {
+    uint8Val = Serial.parseInt();
+    if (uint8Val >= 0 && uint8Val < 2) {
+      settings.currentMissmatch = uint8Val == 1;
+      Save();
+      print8Val = 1;
+    } else {
+      RngErr();
+    }
+  } 
+  else if (cmdStr == "OVER1") {
+    uint8Val = Serial.parseInt();
+    if (uint8Val >= 0 && uint8Val < 2) {
+      overrideStart1 = uint8Val == 1;
+      Save();
+      print8Val = 1;
+    } else {
+      RngErr();
+    }
+  }
+  else if (cmdStr == "OVER2") {
+    uint8Val = Serial.parseInt();
+    if (uint8Val >= 0 && uint8Val < 2) {
+      overrideStart2 = uint8Val == 1;
       Save();
       print8Val = 1;
     } else {
@@ -370,6 +490,8 @@ void printSettings() {
   Serial.println (settings.packSizeKWH, 2);
   Serial.print (F("BMS "));
   Serial.println (settings.useBms, 1);
+  Serial.print (F("MISS "));
+  Serial.println (settings.currentMissmatch, 1);
   Serial.print (F("DBG "));
   Serial.println (settings.debuggingLevel, 1);
   Serial.println (F("-"));
@@ -396,6 +518,10 @@ void outputState() {
   Serial.print (!digitalRead(CHADEMO_IN1) > 0 ? F(":1 ") : F(":0 "));
   Serial.print (F("IN2"));
   Serial.print (!digitalRead(CHADEMO_IN2) > 0 ? F(":1 ") : F(":0 "));
+  Serial.print (F("OVER1"));
+  Serial.print (overrideStart1 > 0 ? F(":1 ") : F(":0 "));
+  Serial.print (F("OVER2"));
+  Serial.print (overrideStart2 > 0 ? F(":1 ") : F(":0 "));
   Serial.print (F("CHG T: "));
   Serial.println (CurrentMillis / 1000 - ChargeTimeRefSecs);
 }
@@ -409,6 +535,7 @@ void broadcastMessage() {
       json["amperage"] = Sensor.Amperes;
       json["power"] = Sensor.KW;
       json["ampHours"] = Sensor.AH;
+      json["soc"] = soc;
 
       size_t len = serializeJson(json, buffer);  // serialize to buffe
       chademoWebServer.getWebSocket().textAll(buffer, len);
@@ -425,6 +552,8 @@ void broadcastMessage() {
     }
     case 2: {
       //car status
+      json["OVER1"] = overrideStart1;
+      json["OVER2"] = overrideStart2;
       json["OUT1"] = digitalRead(CHADEMO_OUT1);
       json["OUT2"] = digitalRead(CHADEMO_OUT2);
       json["IN1"] = !digitalRead(CHADEMO_IN1);
@@ -479,10 +608,10 @@ void loop() {
       digitalWrite(LED_PIN, !digitalRead(LED_PIN));
       Count = 0;
       SerialCommand();
-//      #ifdef SIMPBMS
-//      chademo.setStateOfCharge(simpbms.getStateOfCharge());
-//      #endif
       sendStatusToVCU();
+      if (initShunt) {
+        initaliseShunt();
+      }
       broadcastMessage();
 
       if (print8Val > 0)
@@ -505,5 +634,43 @@ void loop() {
   }
   if (can1.receive(inFrame)) {
     Sensor.handleCANFrame(inFrame);
+    if (settings.useBms) {
+        if (inFrame.id == 0x355) {
+           soc = (inFrame.data[1] << 8) + inFrame.data[0];
+           chademo.setStateOfCharge(soc);
+        } else if (inFrame.id == 0x35A) { 
+          
+//          //alarms
+//          if (inFrame.data[0] & 0x4 == 0x4  && chademo.carStatus.battOverVolt == 0) {
+//            //overvoltage
+//            chademo.carStatus.battOverVolt = 1;
+//            wsPrint.message(F("BMS Over Voltage Error"));
+//
+//          }
+//          if (inFrame.data[0] & 0x40 == 0x40 && chademo.carStatus.battOverTemp == 0) {
+//            //over temperature
+//            chademo.carStatus.battOverTemp = 1;
+//            wsPrint.message(F("BMS Over Temperature Error"));
+//
+//          }
+//
+//          //temperature de-rate
+//          if (inFrame.data[4] & 0x40 == 0x40 && chademo.carStatus.derated == 0) {
+//            wsPrint.message(F("BMS temperature Derate"));
+//            chademo.setTargetAmperage(settings.maxChargeAmperage/2);
+//            chademo.carStatus.derated = 1;
+//          }
+//
+//          //voltage de-rate
+//          if (inFrame.data[4] & 0x04 == 0x04 && chademo.carStatus.derated == 0) {
+//              wsPrint.message(F("BMS Voltage Derate"));
+//              chademo.setTargetAmperage(settings.maxChargeAmperage/2);
+//              chademo.carStatus.derated = 1;
+//
+//          }
+        }
+        
+    }
+
   }
 }

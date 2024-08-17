@@ -1,6 +1,8 @@
 #include "ChademoWebServer.h"
 #include <SPIFFS.h>
 #include <EEPROM.h>
+#include <AsyncElegantOTA.h>;
+
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
@@ -85,42 +87,49 @@ void ChademoWebServer::setup()
          }
      });
 
-    server.on("/edit", 
-        HTTP_POST, 
-        [](AsyncWebServerRequest * request){},
-        [&](AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
-            if (!index) {
-                // open the file on first call and store the file handle in the request object
-                request->_tempFile = SPIFFS.open("/" + filename, "w");
+     server.on(
+         "/start1",
+         HTTP_POST,
+         [](AsyncWebServerRequest * request){},
+         NULL,
+         [&](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
 
-            }
+         overrideStart1 = !overrideStart1;
+         request->send(200, "application/json", "success");
 
-            if (len) {
-                // stream the incoming chunk to the opened file
-                request->_tempFile.write(data, len);
-            }
+     });
 
-            if (final) {
-                // close the file handle as the upload is now done
-                request->_tempFile.close();
+     server.on(
+         "/start2",
+         HTTP_POST,
+         [](AsyncWebServerRequest * request){},
+         NULL,
+         [&](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
 
-                if (filename.substring(filename.lastIndexOf(".")).equals("bin")) {
-                    Serial.println("Firmware uploaded, restarting");
-                    request->send(200, "application/json", "restarting");
-                    ESP.restart();   
-                }
-                request->redirect("/");
-            }
-        }
-        
-    );
+         overrideStart2 = !overrideStart2;
+         request->send(200, "application/json", "success");
+
+     });
+
+      server.on(
+         "/init",
+         HTTP_POST,
+         [](AsyncWebServerRequest * request){},
+         NULL,
+         [&](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
+
+         initShunt = true;
+         request->send(200, "application/json", "success");
+
+     });
+
 
     server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
   
 
   // Start server
   Serial.println("Starting Web Server");
-
+  AsyncElegantOTA.begin(&server);
   server.begin();
 }
 
@@ -134,6 +143,8 @@ void ChademoWebServer::toJson(EESettings& settings, DynamicJsonDocument &root) {
     root["minChargeAmperage"] = settings.minChargeAmperage;
     root["capacity"] = settings.capacity;
     root["debuggingLevel"] = settings.debuggingLevel;
+    root["currentMissmatch"] = settings.currentMissmatch;
+
 }
 
 void ChademoWebServer::fromJson(EESettings& settings, JsonObject &doc) {
@@ -147,5 +158,6 @@ void ChademoWebServer::fromJson(EESettings& settings, JsonObject &doc) {
     settings.minChargeAmperage = doc["minChargeAmperage"];
     settings.capacity = doc["capacity"];
     settings.debuggingLevel = doc["debuggingLevel"];
+    settings.currentMissmatch = doc["currentMissmatch"];
 
 }

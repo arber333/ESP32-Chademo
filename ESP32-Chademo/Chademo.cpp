@@ -11,7 +11,7 @@ template<class T> inline Print &operator <<(Print &obj, T arg) {
 }
 void timestamp();
 
-CHADEMO::CHADEMO()
+CHADEMO::CHADEMO(WebSocketPrint& webSocketPrint) : webSocketPrint { webSocketPrint }
 {
   bStartedCharge = 0;
   bChademoMode = 0;
@@ -27,6 +27,7 @@ CHADEMO::CHADEMO()
   stateHolder = STOPPED;
   carStatus.contactorOpen = 1;
   carStatus.battOverTemp = 0;
+  carStatus.derated = 1;
 
 }
 
@@ -76,7 +77,7 @@ void CHADEMO::setBattOverTemp()
 void CHADEMO::loop()
 {
   static byte frameRotate;
-  if (!digitalRead(CHADEMO_IN1)) //IN1 goes LOW if we have been plugged into the chademo port
+  if (!digitalRead(CHADEMO_IN1) || overrideStart1) //IN1 goes LOW if we have been plugged into the chademo port
   {
     if (insertionTime == 0)
     {
@@ -95,6 +96,7 @@ void CHADEMO::loop()
         if (chademoState == STOPPED && !bStartedCharge) {
           chademoState = STARTUP;
           Serial.println(F("Starting Chademo process."));
+          webSocketPrint.message(F("Starting Chademo process."));
           carStatus.battOverTemp = 0;
           carStatus.battOverVolt = 0;
           carStatus.battUnderVolt = 0;
@@ -116,6 +118,7 @@ void CHADEMO::loop()
     if (bChademoMode == 1)
     {
       Serial.println(F("Stopping chademo process."));
+      webSocketPrint.message(F("Stopping chademo process."));
       bChademoMode = 0;
       bStartedCharge = 0;
       chademoState = STOPPED;
@@ -129,6 +132,9 @@ void CHADEMO::loop()
       {
         Serial.println(F("CAR: Contactor open"));
         Serial.println(F("CAR: Charge Enable OFF"));
+        webSocketPrint.message(F("CAR: Contactor open"));
+        webSocketPrint.message(F("CAR: Charge Enable OFF"));
+  
       }
     }
   }
@@ -138,7 +144,9 @@ void CHADEMO::loop()
 
     if (!bDoMismatchChecks && chademoState == RUNNING)
     {
-      if ((CurrentMillis - mismatchStart) >= mismatchDelay) bDoMismatchChecks = 1;
+      if (settings.currentMissmatch && (CurrentMillis - mismatchStart) >= mismatchDelay) {
+        bDoMismatchChecks = 1;
+      }
     }
 
     if (chademoState == LIMBO && (CurrentMillis - stateMilli) >= stateDelay)
@@ -178,44 +186,52 @@ void CHADEMO::loop()
         //the max allowable amperage just yet.
         bChademoSendRequests = 1; //causes chademo frames to be sent out every 100ms
         setDelayedState(WAIT_FOR_EVSE_PARAMS, 50);
-        if (settings.debuggingLevel > 0) Serial.println(F("Sent params to EVSE. Waiting."));
+        if (settings.debuggingLevel > 0) {
+          Serial.println(F("Sent params to EVSE. Waiting."));
+          webSocketPrint.message(F("Sent params to EVSE. Waiting."));
+
+        }
         break;
       case WAIT_FOR_EVSE_PARAMS:
         //for now do nothing while we wait. Might want to try to resend start up messages periodically if no reply
         break;
       case SET_CHARGE_BEGIN:
-        if (settings.debuggingLevel > 0) Serial.println(F("CAR:Charge enable ON"));
+        if (settings.debuggingLevel > 0) {
+          Serial.println(F("CAR:Charge enable ON"));
+          webSocketPrint.message(F("CAR:Charge enable ON"));
+
+        }
         digitalWrite(CHADEMO_OUT1, HIGH); //signal that we're ready to charge
         carStatus.chargingEnabled = 1; //should this be enabled here???
         setDelayedState(WAIT_FOR_BEGIN_CONFIRMATION, 50);
         break;
       case WAIT_FOR_BEGIN_CONFIRMATION:
-        if (!digitalRead(CHADEMO_IN2)) //inverse logic, OPTOs
+        if (!digitalRead(CHADEMO_IN2) || overrideStart2) //inverse logic, OPTOs
         {
           setDelayedState(CLOSE_CONTACTORS, 100);
         }
         break;
       case CLOSE_CONTACTORS:
-        if (settings.debuggingLevel > 0) Serial.println(F("CAR:Contactor close."));
+        if (settings.debuggingLevel > 0) {
+          Serial.println(F("CAR:Contactor close."));
+          webSocketPrint.message(F("CAR:Contactor close."));
+        }
         digitalWrite(CHADEMO_OUT2, HIGH);
-        setDelayedState(WAIT_FOR_PRECHARGE, 50);
+        setDelayedState(RUNNING, 50);
         carStatus.contactorOpen = 0; //its closed now
         carStatus.chargingEnabled = 1; //please sir, I'd like some charge
         bStartedCharge = 1;
         mismatchStart = millis();
-        break;
-      case WAIT_FOR_PRECHARGE:
-        if (evse_status.presentVoltage > (Voltage - 50)) {
-          if (settings.debuggingLevel > 0) Serial.println(F("Pre-charge completed"));
-          setDelayedState(RUNNING, 50);
-        }
         break;
       case RUNNING:
         //do processing here by taking our measured voltage, amperage, and SOC to see if we should be commanding something
         //different to the EVSE. Also monitor temperatures to make sure we're not incinerating the pack.
         break;
       case CEASE_CURRENT:
-        if (settings.debuggingLevel > 0) Serial.println(F("CAR:Current req to 0"));
+        if (settings.debuggingLevel > 0){
+          Serial.println(F("CAR:Current req to 0"));
+          webSocketPrint.message(F("CAR:Current req to 0"));
+        }
         carStatus.targetCurrent = 0;
         chademoState = WAIT_FOR_ZERO_CURRENT;
         break;
@@ -226,7 +242,10 @@ void CHADEMO::loop()
         }
         break;
       case OPEN_CONTACTOR:
-        if (settings.debuggingLevel > 0) Serial.println(F("CAR:OPEN Contacor"));
+        if (settings.debuggingLevel > 0) {
+          Serial.println(F("CAR:OPEN Contacor"));
+          webSocketPrint.message(F("CAR:OPEN Contacor"));
+        }
         digitalWrite(CHADEMO_OUT2, LOW);
         digitalWrite(CHADEMO_OUT2, LOW);
         carStatus.contactorOpen = 1;
@@ -236,6 +255,7 @@ void CHADEMO::loop()
         break;
       case FAULTED:
         Serial.println(F("CAR: fault!"));
+        webSocketPrint.message(F("CAR: fault!"));
         chademoState = CEASE_CURRENT;
         //digitalWrite(OUT2, LOW);
         //digitalWrite(OUT1, LOW);
@@ -249,6 +269,9 @@ void CHADEMO::loop()
           {
             Serial.println(F("CAR:Contactor OPEN"));
             Serial.println(F("CAR:Charge Enable OFF"));
+            webSocketPrint.message(F("CAR:Contactor OPEN"));
+            webSocketPrint.message(F("CAR:Charge Enable OFF"));
+
           }
           bChademoSendRequests = 0; //don't need to keep sending anymore.
           bListenEVSEStatus = 0; //don't want to pay attention to EVSE status when we're stopped
@@ -267,6 +290,7 @@ void CHADEMO::doProcessing()
   {
     //this is BAD news. We can't do the normal cease current procedure because the EVSE seems to be unresponsive.
     Serial.println(F("EVSE comm fault! Commencing emergency shutdown!"));
+    webSocketPrint.message(F("EVSE comm fault! Commencing emergency shutdown!"));
     //yes, this isn't ideal - this will open the contactor and send the shutdown signal. It's better than letting the EVSE
     //potentially run out of control.
     chademoState = OPEN_CONTACTOR;
@@ -280,6 +304,7 @@ void CHADEMO::doProcessing()
       if (vOverFault > 9)
       {
         Serial.println(F("Over voltage fault!"));
+        webSocketPrint.message(F("Over voltage fault!"));
         carStatus.battOverVolt = 1;
         chademoState = CEASE_CURRENT;
       }
@@ -352,6 +377,7 @@ void CHADEMO::handleCANFrame(CANMessage &frame)
       {
         Serial.print(F("EVSE can't provide needed voltage. Aborting."));
         Serial.println(evse_params.availVoltage);
+        webSocketPrint.message("EVSE can't provide needed voltage (" + String(evse_params.availVoltage) + "). Aborting.");
         chademoState = CEASE_CURRENT;
       }
     }
@@ -365,7 +391,7 @@ void CHADEMO::handleCANFrame(CANMessage &frame)
     //the target current got wacked for some reason and left at zero.
     if (chademoState != RUNNING && tempAvailCurr > carStatus.targetCurrent)
     {
-      carStatus.targetCurrent = min(tempAvailCurr, settings.maxChargeAmperage);
+      carStatus.targetCurrent = minimum(tempAvailCurr, settings.maxChargeAmperage);
     }
   }
 
@@ -400,6 +426,8 @@ void CHADEMO::handleCANFrame(CANMessage &frame)
           Serial.print(evse_status.presentVoltage);
           Serial.print(F(" Measured: "));
           Serial.println(Voltage);
+          webSocketPrint.message("Voltage mismatch! Aborting! Reported:" + String(evse_status.presentVoltage) + "  Measured: " + String(Voltage));
+
           carStatus.voltDeviation = 1;
           chademoState = CEASE_CURRENT;
         }
@@ -417,6 +445,9 @@ void CHADEMO::handleCANFrame(CANMessage &frame)
           Serial.print(evse_status.presentCurrent);
           Serial.print(F(" Measured: "));
           Serial.println(Current * -1.0);
+          
+          webSocketPrint.message("Current mismatch! Aborting! Reported:" + String(evse_status.presentCurrent) + "  Measured: " + String((Current * -1.0)));
+
           carStatus.currDeviation = 1;
           chademoState = CEASE_CURRENT;
         }
@@ -447,6 +478,8 @@ void CHADEMO::handleCANFrame(CANMessage &frame)
         Serial.print(F("EVSE:fault code "));
         Serial.print(evse_status.status,HEX);
         Serial.println(F(" Abort."));
+        webSocketPrint.message("EVSE:fault code " + evse_status.status);
+
         if (chademoState == RUNNING) chademoState = CEASE_CURRENT;
       }
     }
@@ -459,6 +492,8 @@ void CHADEMO::handleCANFrame(CANMessage &frame)
         if ((evse_status.status & EVSE_STATUS_STOPPED) != 0)
         {
           Serial.println(F("EVSE:stop charging."));
+          webSocketPrint.message(F("EVSE:stop charging."));
+
           chademoState = CEASE_CURRENT;
         }
 
@@ -466,6 +501,7 @@ void CHADEMO::handleCANFrame(CANMessage &frame)
         if (evse_status.remainingChargeSeconds == 0)
         {
           Serial.println(F("EVSE:time elapsed..Ending"));
+          webSocketPrint.message(F("EVSE:time elapsed..Ending"));
           chademoState = CEASE_CURRENT;
         }
       }
@@ -492,12 +528,11 @@ void CHADEMO::sendCANBattSpecs()
   outFrame.data[3] = 0x00; // Not Used
   outFrame.data[4] = lowByte(settings.maxChargeVoltage);
   outFrame.data[5] = highByte(settings.maxChargeVoltage);
-//  #ifdef SIMPBMS
-//    outFrame.data[6] = (uint8_t)soc; //charged_rate_reference (change to SoC from BMS)
-//  #endif
-//  #ifndef SIMPBMS
-  outFrame.data[6] = (uint8_t)((settings.capacity - settings.ampHours) / settings.capacity) * 100; //charged_rate_reference ((46 - 30) / 46) * 100)
- /// #endif
+  if(settings.useBms) {
+     outFrame.data[6] = 100;
+  } else {
+     outFrame.data[6] = (uint8_t)settings.capacity; //pack size....
+  }
   outFrame.data[7] = 0; //not used
 
   ACAN_ESP32::can.tryToSend(outFrame);
@@ -525,8 +560,8 @@ void CHADEMO::sendCANChargingTime()
   outFrame.data[2] = 90; //ask for how long of a charge? It will be forceably stopped if we hit this time
   outFrame.data[3] = 60; //how long we think the charge will actually take
   outFrame.data[4] = 0; //not used
-  outFrame.data[5] = 0; //not used
-  outFrame.data[6] = 0; //not used
+  outFrame.data[5] = 0x02; //not used but lets just report a large battery incase
+  outFrame.data[6] = 0x0; //not used
   outFrame.data[7] = 0; //not used
   ACAN_ESP32::can.tryToSend(outFrame);
   if (settings.debuggingLevel > 1)
@@ -574,12 +609,11 @@ void CHADEMO::sendCANStatus()
   outFrame.data[3] = askingAmps;
   outFrame.data[4] = faults;
   outFrame.data[5] = status;
-  #ifdef SIMPBMS
-  outFrame.data[6] = 100; //charged rate (change to 100 for use with BMS SoC)
-  #endif
-  #ifndef SIMPBMS
-  outFrame.data[6] = (uint8_t)settings.kiloWattHours; //charged rate (change to 100 for use with BMS SoC)
-  #endif
+  if(settings.useBms) {
+      outFrame.data[6] = soc; //charged rate (change to 100 for use with BMS SoC)
+  } else {
+      outFrame.data[6] = (uint8_t)((settings.capacity - settings.ampHours) / settings.capacity) * 100; //charged rate (change to 100 for use with BMS SoC)
+  }
   outFrame.data[7] = 0; //not used
   ACAN_ESP32::can.tryToSend(outFrame);
 
@@ -600,6 +634,8 @@ void CHADEMO::sendCANStatus()
     Serial.print(F(" kWh: "));
     Serial.print(settings.kiloWattHours);
     timestamp();
+
+
   }
 
 
@@ -617,5 +653,3 @@ void CHADEMO::sendCANStatus()
   if (askingAmps > carStatus.targetCurrent) askingAmps--;
 
 }
-
-CHADEMO chademo;

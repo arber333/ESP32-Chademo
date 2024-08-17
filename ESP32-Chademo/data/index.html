@@ -15,19 +15,19 @@
 <div id="output">
 	<div class="flex-block">
 		<div class="info-block">
-			<h3>Chademo Status</h3> 
+			<h3>Chademo Status</h3>
 			<div class="data" id="mode">Waiting</div>
 		</div>
 		<div class="info-block">
-			<h3>EVSE Max Voltage</h3> 
+			<h3>EVSE Max Voltage</h3>
 			<div class="data"><span id="evseVoltage">-</span>V</div>
 		</div>
 		<div class="info-block">
-			<h3>EVSE Threshold Voltage</h3> 
+			<h3>EVSE Threshold Voltage</h3>
 			<div class="data"><span id="evseThreshold">-</span>V</div>
 		</div>
 		<div class="info-block">
-			<h3>EVSE Max Current</h3> 
+			<h3>EVSE Max Current</h3>
 			<div class="data"><span id="evseAmps">-</span>A</div>
 		</div>
 	</div>
@@ -37,38 +37,51 @@
 		<div id="container-current" class="chart-container"></div>
 		<div id="container-power" class="chart-container"></div>
 	</figure>
+	<figure class="highcharts-figure flex-block">
+		<div id="container-soc" class="chart-container"></div>
+	</figure>
 	<div class="flex-block">
 		<div class="info-block">
-			<h3>IN 1</h3> 
+			<h3>IN 1</h3>
 			<div class="data" id="in1">-</div>
 		</div>
 		<div class="info-block">
-			<h3>IN 2</h3> 
+			<h3>IN 2</h3>
 			<div class="data" id="in2">-</div>
 		</div>
 		<div class="info-block">
-			<h3>OUT 1</h3> 
+			<h3>OUT 1</h3>
 			<div class="data" id="out1">-</div>
 		</div>
 		<div class="info-block">
-			<h3>OUT 2</h3> 
+			<h3>OUT 2</h3>
 			<div class="data" id="out2">-</div>
+		</div>
+	</div>
+	<div class="flex-block">
+		<div class="info-block">
+			<h3>IN 1 OVERRIDE</h3>
+			<div class="data" id="over1">-</div>
+		</div>
+		<div class="info-block">
+			<h3>IN 2 OVERRIDE</h3>
+			<div class="data" id="over2">-</div>
 		</div>
 	</div>
 
 </div>
 
 <p><a href="/wifi">Wifi Settings</a>
-<p><a href="#" onclick="toggleHidden('update')">Upload Update</a>
+<p><a href="/update" >Upload Update</a>
 <p><a href="/settings.html">Settings</a>
+<p><button type="button" id="start1">Toggle Override Start 1</button> Alpha - Try when Charger fails to start?</p>
+<p><button type="button" id="start2">Toggle Override Start 2</button> Alpha - Try when Charger fails to start?</p>
+<p><button type="button" id="initShunt">InitShunt</button></p>
 
-<div id="update" class="hidden">
-	<h2 id="update">Update</h2>
-	<p>Upload any files for updating this web interface.</p>
-	<form id="uploadform" enctype="multipart/form-data" action="edit" method="POST">
-		<input id="updatefile" name="updatefile" type="file" onchange="fileSelected();" />
-		<input type="button" onclick="uploadFile();" value="Upload" />
-	</form>
+<div>
+	<h2>Log</h2>
+	<button type="button" id="saveLog">Save Log</button>
+	<textarea style="width:100%; height:400px;"id="log"></textarea>
 </div>
 
 

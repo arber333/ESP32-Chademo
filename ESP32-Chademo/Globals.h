@@ -15,8 +15,8 @@
 #define MCP2517_MOSI 23
 
 #define CAN_BAUD 500000
-#define min(a, b)           (((a) < (b)) ?  (a) : (b))
-#define EEPROM_VALID	0xEE
+#define minimum(a, b)           (((a) < (b)) ?  (a) : (b))
+#define EEPROM_VALID	0xCC
 
 //These have been moved to eeprom. After initial compile the values will be read from EEPROM.
 //These thus set the default value to write to eeprom upon first start up
@@ -39,6 +39,8 @@ typedef struct
   uint8_t capacity; //27
   uint8_t debuggingLevel; //29
   bool useBms;
+  bool currentMissmatch;
+
 } EESettings;
 
 extern EESettings settings;
@@ -46,5 +48,7 @@ extern float Voltage;
 extern float Current;
 extern unsigned long CurrentMillis;
 extern int Count;
-
+extern bool overrideStart1;
+extern bool overrideStart2;
+extern bool initShunt;
 #endif
