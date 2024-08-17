@@ -4,8 +4,8 @@
 #define CHADEMO_IN1 36 //Input1 for chademo
 #define CHADEMO_IN2 39 //PP input
 
-#define CHADEMO_OUT1 33//??
-#define CHADEMO_OUT2 25//??
+#define CHADEMO_OUT1 26 // Contactor
+#define CHADEMO_OUT2 27 // Contactor
 
 #define MCP2515_CS 5// CS input of MCP2515
 #define MCP2515_INT 15 // INT output of MCP2515
