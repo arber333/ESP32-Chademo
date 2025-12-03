@@ -143,7 +143,7 @@ void setup() {
 
   WiFi.mode(WIFI_AP);
   WiFi.hostname(HOSTNAME);
-  WiFi.begin("Beetle_Chademo", "Fia84grapu");
+  WiFi.begin("ESP32-CHADEMO", "ChadMeO");
 
   chademoWebServer.setup();
 
