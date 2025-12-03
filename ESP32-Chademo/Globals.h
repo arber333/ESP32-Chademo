@@ -14,7 +14,8 @@
 #define MCP2517_MISO 19
 #define MCP2517_MOSI 23
 
-#define CAN_BAUD 500000
+#define CAN_BAUD 500000 // CAN0 speed
+#define CAN1_BAUD 250000 // CAN1 speed
 #define minimum(a, b)           (((a) < (b)) ?  (a) : (b))
 #define EEPROM_VALID	0xCC
 
